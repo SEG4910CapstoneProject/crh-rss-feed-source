@@ -1,0 +1,5 @@
+
+rss-feed:
+  retries:
+    max-attempts: 3
+    retry-backoff-millis: 0

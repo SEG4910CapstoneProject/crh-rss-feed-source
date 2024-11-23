@@ -1,0 +1,9 @@
+name: Call Build and Test workflow
+
+on:
+  push:
+    branches:
+      - main
+jobs:
+  call-build-and-test:
+    uses: SEG4910CapstoneProject/workflows/.github/workflows/build.yml@main

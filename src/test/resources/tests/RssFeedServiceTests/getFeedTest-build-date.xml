@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+
+    <channel>
+        <title>Fake Rss Feed</title>
+        <link>http://example.com/fake/</link>
+        <description>A Sample Fake Rss Feed</description>
+        <!--Unix 3000-->
+        <lastBuildDate>Thu, 01 Jan 1970 00:00:03 +0000</lastBuildDate>
+        <item>
+            <title>title1</title>
+            <link>url</link>
+            <description>description1</description>
+            <!--Unix 10000-->
+            <pubDate>Thu, 01 Jan 1970 00:00:10 +0000</pubDate>
+        </item>
+    </channel>
+
+</rss>

@@ -1,0 +1,30 @@
+
+rss-feed:
+  retries:
+    max-attempts: 3
+    retry-backoff-millis: 3000
+
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB_NAME}"
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+  data:
+    mongodb:
+      host: ${MONGO_HOST}
+      port: ${MONGO_PORT}
+      username: ${MONGO_USERNAME}
+      password: ${MONGO_PASSWORD}
+      database: ${MONGO_DB_NAME}
+      authentication-database: ${MONGO_AUTH_DB:admin}
+      uuid-representation: STANDARD
+
