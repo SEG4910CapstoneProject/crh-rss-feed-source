@@ -18,7 +18,6 @@ The rss feed source task is a spring cloud task that ingests articles from rss f
 | MONGO_AUTH_DB        | **Optional** Authentication database name for mongodb. By default is "admin" |
 
 
-
 ### Configuration options
 | Configuration                         | Type   | Description                                                                                                            |
 |---------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------|
