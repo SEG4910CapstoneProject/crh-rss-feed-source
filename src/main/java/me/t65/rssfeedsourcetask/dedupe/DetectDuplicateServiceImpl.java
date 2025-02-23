@@ -22,7 +22,7 @@ public class DetectDuplicateServiceImpl implements DetectDuplicateService {
     }
 
     @Override
-    public Boolean isDuplicateArticle(String link) {
+    public Boolean isDuplicateArticle(String link) {   // true: yes its in postgres + yes in mong     false: normally no its not duplicate and its returns this, or yes in postgres but mongo doesnt have it  
         // Normalize and hash the link
         long hashedLink = NormalizeLinks.normalizeAndHashLink(link);
         // Check if the hashed link exists in Postgres
