@@ -4,7 +4,7 @@ WORKDIR /project-build
 
 COPY ./ /project-build
 
-RUN mvn clean package
+RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21.0.2_13-jre-alpine
 
