@@ -43,7 +43,7 @@ public class Config {
     public WebClient webClient() {
         LOGGER.info("Configuring: {}",System.getenv("OPEN_CTI_PRIVATE_KEY"));
         return WebClient.builder().exchangeStrategies(ExchangeStrategies.builder()
-        .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(500*1024)).build())
+        .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024*1024)).build())
         .baseUrl("http://opencti:8080")
         .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
         .defaultHeader("Authorization","Bearer "+System.getenv("OPEN_CTI_PRIVATE_KEY"))

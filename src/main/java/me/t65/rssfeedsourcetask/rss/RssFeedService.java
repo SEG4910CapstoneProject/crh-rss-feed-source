@@ -1,5 +1,7 @@
 package me.t65.rssfeedsourcetask.rss;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rometools.rome.feed.synd.SyndContent;
 import com.rometools.rome.feed.synd.SyndEntry;
 import com.rometools.rome.feed.synd.SyndFeed;
@@ -13,6 +15,7 @@ import me.t65.rssfeedsourcetask.db.mongo.ArticleContentEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
 import me.t65.rssfeedsourcetask.dedupe.DetectDuplicateService;
 import me.t65.rssfeedsourcetask.dedupe.NormalizeLinks;
+import me.t65.rssfeedsourcetask.dto.ArticlePrimary;
 import me.t65.rssfeedsourcetask.feed.*;
 import me.t65.rssfeedsourcetask.utils.DateUtilsService;
 
@@ -67,6 +70,9 @@ public class RssFeedService implements FeedService {
     private final DBService dbService;
     private final Scheduler scheduler;
 
+    private final ObjectMapper objectMapper;
+
+
     @Autowired
     public RssFeedService(
             WebClient webClient,
@@ -75,7 +81,8 @@ public class RssFeedService implements FeedService {
             DateUtilsService dateUtilsService,
             DBService dbService,
             DetectDuplicateService detectDuplicateService,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            ObjectMapper objectMapper) {
         //this.restTemplate = restTemplate;
         this.webClient = webClient;
         this.config = config;
@@ -84,6 +91,8 @@ public class RssFeedService implements FeedService {
         this.dbService = dbService;
         this.detectDuplicateService = detectDuplicateService;
         this.scheduler = scheduler;
+        this.objectMapper = objectMapper;
+
     }
 
 //     @Override
@@ -314,11 +323,7 @@ public class RssFeedService implements FeedService {
         } else {
             // we dont have a date to start fetching from; pull all the stuff that open cti offers
             requestBody.put("query", "{reports{edges{node{standard_id externalReferences{edges{node{source_name url}}} objectLabel {value} name description published}}}}");
-            // save todays date; TODO: as for now I save todays date, but afterward we should save starting the last published date we find in the response of whats before.
-            // to not loose important articles
-            Instant todaysUTC = Instant.now();
-            LOGGER.info("Initial system build. All information should be pulled from open cti. Saving {} for future updates.",todaysUTC.toString());// here the format is good
-            dbService.saveVersion(todaysUTC);// move this below, only do it if the query was successful
+            LOGGER.info("Initial system build. All information should be pulled from open cti. ");// here the format is good
         }
 
 
@@ -333,7 +338,36 @@ public class RssFeedService implements FeedService {
         .bodyToMono(String.class)// better to stream, than buffering evth in memory TODO
         .retryWhen(getRetrySpec("pulling articles from Open CTI"))
         .doOnNext(response -> LOGGER.info("Response: "+response))
+        .then(saveVersionDate())
         .doOnError(e->LOGGER.error("Error getting reports from open cti",e));
+
+        // return webClient
+        // .post()
+        // .uri(url)
+        // .bodyValue(requestBody)
+        // .retrieve()
+        // .bodyToFlux(JsonNode.class)// ArticlePrimary is NOT the object we save to the database, it just primarly
+        // .flatMap(json->Flux.fromIterable(json.get("data").get("reports").get("edges")))
+        // .map(edge->objectMapper.convertValue(edge.get("node"),ArticlePrimary.class))
+        // .retryWhen(getRetrySpec("pulling articles from Open CTI"))
+        // .then(saveVersionDate())
+        // .doOnNext(response -> LOGGER.info("Response: "+response))
+        // .doOnError(e->LOGGER.error("Error getting reports from open cti",e));
+    }
+
+    private Mono<String> saveVersionDate() {
+        // save todays date; TODO: as for now I save todays date, but afterward we should save starting the last published date we find in the response of whats before.
+        // to not loose important articles
+
+        Instant todaysUTC = Instant.now();
+        LOGGER.info("Saving {} for future updates.",todaysUTC.toString());
+        if (dbService.saveVersion(todaysUTC)) {
+            return Mono.just("ok");
+        } else {
+            return Mono.just("a problem happened");
+        }
+
+
     }
 
 
