@@ -1,5 +1,7 @@
 package me.t65.rssfeedsourcetask.feed;
 
+import me.t65.rssfeedsourcetask.dto.Article;
+import me.t65.rssfeedsourcetask.dto.ArticlePrimary;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -16,5 +18,6 @@ public interface FeedService {
 
 
 
-    Mono<String> fetchArticlesFromOpenCti(String s);
+    Flux<Article> fetchArticlesFromOpenCti(String s);
+    void  printArticles(ArticlePrimary article);
 }

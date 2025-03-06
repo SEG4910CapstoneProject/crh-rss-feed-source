@@ -69,9 +69,10 @@ public class RssFeedSourceTask implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         LOGGER.info("Pulling articles from the open cti endpoint\n");
         Mono.just("")
-        .flatMap(feedService::fetchArticlesFromOpenCti)
-        .doOnNext(e->LOGGER.info("Finished pulling"))
+        .flatMapMany(feedService::fetchArticlesFromOpenCti) // ensures inner flux is subscribed to
+        //.doOnNext(e->LOGGER.info("Finished pulling"))
         .subscribeOn(scheduler)
+        .collectList()
         .block();        
     }
 }

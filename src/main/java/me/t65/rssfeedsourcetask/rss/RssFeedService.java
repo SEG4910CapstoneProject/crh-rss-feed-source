@@ -15,7 +15,11 @@ import me.t65.rssfeedsourcetask.db.mongo.ArticleContentEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
 import me.t65.rssfeedsourcetask.dedupe.DetectDuplicateService;
 import me.t65.rssfeedsourcetask.dedupe.NormalizeLinks;
+import me.t65.rssfeedsourcetask.dto.Article;
 import me.t65.rssfeedsourcetask.dto.ArticlePrimary;
+import me.t65.rssfeedsourcetask.dto.Edges;
+import me.t65.rssfeedsourcetask.dto.NodeArticle;
+import me.t65.rssfeedsourcetask.dto.RelatedLink;
 import me.t65.rssfeedsourcetask.feed.*;
 import me.t65.rssfeedsourcetask.utils.DateUtilsService;
 
@@ -47,13 +51,16 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 /** Feed service that reads articles from an RSS source */
 @Service
@@ -300,16 +307,152 @@ public class RssFeedService implements FeedService {
 
    // might need to subscribe, will see
 
-    public Mono<String> fetchArticlesFromOpenCti(String s){
+    public Flux<Article> fetchArticlesFromOpenCti(String s){
         LOGGER.info("in fetchArticlesFromOpenCti");
         String openCtiEndpoint = "/graphql";
         return 
-        Mono.just(openCtiEndpoint)
-        .flatMap(url->sendQuery(url)) // I dont think the map/flatMap here is an issue
-        .subscribeOn(scheduler);
+            Flux.just(openCtiEndpoint)
+                .flatMap(url->sendQuery(url))
+                .flatMap(this::transformArticle)
+                .doOnNext(article->printArticle(article))// new object creation here
+                .filter(  // I have a flux of Article, I need to make sure the links aren't duplicated
+                    article -> {
+                        return !detectDuplicateService.isDuplicateArticle(article.getLinkPrimary());
+                })
+                // .flatMap(article -> {
+                //     transformIntoDbObjects(article);
+                // })
+                
+                
+                
+                
+                ;
+                    
     }
 
-    public Mono<String> sendQuery(String url) {
+    //public 
+
+    private void printArticle(Article arc) {
+        LOGGER.info("Converted NEW article with id {}",arc.getId());
+        LOGGER.info("The source is {}",arc.getSource());
+        LOGGER.info("The link primary is {}",arc.getLinkPrimary());
+        LOGGER.info("The external references are: ");
+
+
+        List<String> relLinks = arc.getRelLinks().stream()
+            .map((e)-> {
+                LOGGER.info("The source is: {}, The url is: {}",e.getSource(),e.getRelatedLink());
+                return e.getSource() + " - " + e.getRelatedLink();   
+            }).toList();
+
+        LOGGER.info("The object labels are: ");
+
+        // List<String> labels = arc.getLabels().stream().map((label)->{
+        //     LOGGER.info("The label is: {}",label);
+        //     return label;
+        // }).toList();
+
+        arc.getLabels().stream().map((label)->{
+            LOGGER.info("The label is: {}",label);
+            return label;
+        }).toList();
+
+
+        LOGGER.info("The name is: {}",arc.getName());
+
+        LOGGER.info("The description is: {}",arc.getDescription());
+
+        LOGGER.info("The date published is: {}",arc.getDatePublished());
+
+
+    }
+
+    // this method need to split the externalReferences array into single articles (each article need to have exactly one link, the res of links would go to 
+    // another object called RelatedLinks)
+    // this method also writes the correct source name for articles coming from BleepingComputer (scan the link and overwrite the source by BleepingComputer instead of title of article)
+    public Flux<Article> transformArticle(ArticlePrimary article) {
+        Article arc;
+        UUID id = rssIdGenerator.generateId();
+        //String src;
+        //String linkPrimary;
+        List<Edges> resources = article.getExternalReferences().getEdges();
+        int indexPrimary = detectPrimaryLink(resources);
+        String src = resources.get(indexPrimary).getNode().getSource();// the source of the primary article
+        String linkPrimary = resources.get(indexPrimary).getNode().getUrl();
+        List<RelatedLink> relLinks = new ArrayList<>();
+
+        IntStream.range(0,resources.size())
+            .forEach(i -> {
+                if (i != indexPrimary) {
+                    RelatedLink r = new RelatedLink(resources.get(i).getNode().getSource(), resources.get(i).getNode().getUrl());
+                    relLinks.add(r);
+                }
+            });
+        // until now we gathered all related links
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < article.getLabels().size();i++) {
+            labels.add(article.getLabels().get(i).getValue());
+        }
+
+        //LOGGER.info("the source is inside transformArticle: {}, index P {}",src,indexPrimary);
+
+        arc = new Article(id,src,linkPrimary,relLinks,labels,article.getName(),article.getDescription(),article.getDatePublished());
+        
+        return Flux.just(arc);
+    }
+
+    // this should detect whats the primary article link, serves as a black list to remove links like github and .txt files; that are relevant but that are not primary links. 
+    private int detectPrimaryLink(List<Edges> resources) {
+        int indexRes = -1; // index of the primary link
+        int probableIndex = -1;
+
+        for (int i = 0; i < resources.size();i++) {
+            Edges edge = resources.get(i);
+            cleanSourceName(edge.getNode());
+            if (!(edge.getNode().getUrl().contains("github.com") 
+                || edge.getNode().getUrl().contains("githubusercontent.com") 
+                    || edge.getNode().getUrl().endsWith(".txt") 
+                        || edge.getNode().getUrl().endsWith(".csv")
+                            || edge.getNode().getUrl().contains("https://twitter.com")
+                            || edge.getNode().getUrl().contains("https://otx.alienvault.com"))) {
+                            // then this is a primary link article
+                            // TODO: more restrictions might get added
+                            indexRes = i;
+            } else if (edge.getNode().getUrl().contains("https://otx.alienvault.com")) {
+                probableIndex = i;
+            }
+
+            if (indexRes != -1) {
+                break;
+            }
+
+        }
+
+        if (indexRes == -1) {
+            if (probableIndex != -1) {
+                indexRes = probableIndex;
+            } else {
+                indexRes = 0;
+            }
+        }
+
+        return indexRes;
+
+    }
+
+    private NodeArticle cleanSourceName(NodeArticle pair) {
+        if (pair.getUrl().contains("www.bleepingcomputer.com")) {
+            // ok the url is a bleeping computer one
+            if (!pair.getSource().equals("AlienVault")) {
+                // it's not AlienVault as a source name
+                // so overwrite the source name by Bleeping Computer
+                pair.setSource("Bleeping Computer");
+            }
+        }
+        return pair;
+    }
+
+    public Flux<ArticlePrimary> sendQuery(String url) {
         LOGGER.info("in send Query");
         Map<String, String> requestBody = new HashMap<>();
         String last_system_update = dbService.getLastVersionUpdateTime();
@@ -330,41 +473,68 @@ public class RssFeedService implements FeedService {
         LOGGER.info("QUERY HERE: {}",requestBody.get("query"));
 
         // changes come here; best of cases here we return a dto object of whats important from db
-        return webClient
-        .post()
-        .uri(url)
-        .bodyValue(requestBody)
-        .retrieve()
-        .bodyToMono(String.class)// better to stream, than buffering evth in memory TODO
-        .retryWhen(getRetrySpec("pulling articles from Open CTI"))
-        .doOnNext(response -> LOGGER.info("Response: "+response))
-        .then(saveVersionDate())
-        .doOnError(e->LOGGER.error("Error getting reports from open cti",e));
-
         // return webClient
         // .post()
         // .uri(url)
         // .bodyValue(requestBody)
         // .retrieve()
-        // .bodyToFlux(JsonNode.class)// ArticlePrimary is NOT the object we save to the database, it just primarly
-        // .flatMap(json->Flux.fromIterable(json.get("data").get("reports").get("edges")))
-        // .map(edge->objectMapper.convertValue(edge.get("node"),ArticlePrimary.class))
+        // .bodyToMono(String.class)// better to stream, than buffering evth in memory TODO
         // .retryWhen(getRetrySpec("pulling articles from Open CTI"))
-        // .then(saveVersionDate())
         // .doOnNext(response -> LOGGER.info("Response: "+response))
+        // .then(saveVersionDate())
         // .doOnError(e->LOGGER.error("Error getting reports from open cti",e));
+
+        return webClient
+        .post()
+        .uri(url)
+        .bodyValue(requestBody)
+        .retrieve()
+        .bodyToFlux(JsonNode.class)// ArticlePrimary is NOT the object we save to the database, it just primarly
+        .flatMap(json->Flux.fromIterable(json.get("data").get("reports").get("edges")))
+        .map(edge->objectMapper.convertValue(edge.get("node"),ArticlePrimary.class))
+        //.retryWhen(getRetrySpec("pulling articles from Open CTI"))
+        //.then(saveVersionDate())
+        .doOnNext(res->printArticles(res));// apparently this operates on every single article emitted by the flux, need to save this object now to the db instead of printing it
+        //.doOnError(e->LOGGER.error("Error getting reports from open cti",e));
     }
 
-    private Mono<String> saveVersionDate() {
+    public void printArticles(ArticlePrimary article) {
+        LOGGER.info("Converted article with id {}",article.getStandardId());
+        //LOGGER.info("The external references are: {}",
+        List<String> links = article.getExternalReferences()
+            .getEdges().stream()
+            .map((e)-> {
+                LOGGER.info("The source is: {}, The url is: {}",e.getNode().getSource(),e.getNode().getUrl());
+                return e.getNode().getSource() + " - " + e.getNode().getUrl();   
+            }).toList();
+
+        LOGGER.info("The external references are: {}", links);
+
+        List<String> labels = article.getLabels().stream().map((label)->{
+            return label.getValue();
+        }).toList();
+
+        LOGGER.info("The object labels are: {}",labels);
+
+        LOGGER.info("The name is: {}",article.getName());
+
+        LOGGER.info("The description is: {}",article.getDescription());
+
+        LOGGER.info("The date published is: {}",article.getDatePublished());
+    }
+
+
+
+    private Flux<String> saveVersionDate() {
         // save todays date; TODO: as for now I save todays date, but afterward we should save starting the last published date we find in the response of whats before.
         // to not loose important articles
 
         Instant todaysUTC = Instant.now();
         LOGGER.info("Saving {} for future updates.",todaysUTC.toString());
         if (dbService.saveVersion(todaysUTC)) {
-            return Mono.just("ok");
+            return Flux.just("ok");
         } else {
-            return Mono.just("a problem happened");
+            return Flux.just("a problem happened");
         }
 
 
