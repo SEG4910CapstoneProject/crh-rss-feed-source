@@ -1,11 +1,16 @@
 package me.t65.rssfeedsourcetask.dto;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Edges {
-    private List<NodeArticle> listOfNodes;
-    public Edges(List<NodeArticle> listOfNodes) {
-        this.listOfNodes = listOfNodes;
+    @JsonProperty("node")
+    private NodeArticle node;
+    public Edges(NodeArticle node) {
+        this.node = node;
+    }
+
+    public NodeArticle getNode() {
+        return this.node;
     }
 
 }
