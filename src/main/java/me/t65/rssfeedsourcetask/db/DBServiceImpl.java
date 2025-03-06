@@ -1,13 +1,19 @@
 package me.t65.rssfeedsourcetask.db;
 
 import me.t65.rssfeedsourcetask.db.mongo.repository.ArticleContentRepository;
+import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
+import me.t65.rssfeedsourcetask.db.postgres.entities.OpenCtiSourcesEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.SourcesEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.VersionsEntity;
 import me.t65.rssfeedsourcetask.db.postgres.repository.ArticlesRepository;
+import me.t65.rssfeedsourcetask.db.postgres.repository.OpenCtiRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.SourcesRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.VersionsRepository;
+import me.t65.rssfeedsourcetask.dedupe.NormalizeLinks;
+import me.t65.rssfeedsourcetask.dto.Article;
 import me.t65.rssfeedsourcetask.feed.ArticleData;
 import me.t65.rssfeedsourcetask.utils.DateUtilsService;
+import reactor.core.publisher.Mono;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,18 +35,21 @@ public class DBServiceImpl implements DBService {
 
     private final DateUtilsService dateUtilsService;
     private final VersionsRepository versionsRepository;
+    private final OpenCtiRepository openCtiRepository;
 
     public DBServiceImpl(
             ArticlesRepository articlesRepository,
             ArticleContentRepository articleContentRepository,
             SourcesRepository sourcesRepository,
             DateUtilsService dateUtilsService,
-            VersionsRepository versionsRepository) {
+            VersionsRepository versionsRepository,
+            OpenCtiRepository openCtiRepository ) {
         this.articlesRepository = articlesRepository;
         this.articleContentRepository = articleContentRepository;
         this.sourcesRepository = sourcesRepository;
         this.dateUtilsService = dateUtilsService;
         this.versionsRepository = versionsRepository;
+        this.openCtiRepository = openCtiRepository;
     }
 
     @Override
@@ -102,5 +111,27 @@ public class DBServiceImpl implements DBService {
             LOGGER.error("Failed to write to db to save current version", e);
             throw e;
         }
+    }
+
+    public Mono<ArticleData> transformIntoDbObjects(Article arc) {
+        // first, I need to get the source of this article and go 
+        // to the open cti sources to actually get the source id
+        OpenCtiSourcesEntity src_entity = openCtiRepository.findIdBySourceName(arc.getSource());
+
+        int src_id = src_entity.getSourceId();
+        //LOGGER.info("the src is is: {}",src_id);
+        Date date_ingested = dateUtilsService.getCurrentDate();
+        // TODO, in the database, the date_published is a date, how will this translate to a date (I have a timestamp with zone type)
+        long hashLink = NormalizeLinks.normalizeAndHashLink(arc.getLinkPrimary());
+        Instant inst_published_date = Instant.parse(arc.getDatePublished());
+        ArticlesEntity articleEntity = new ArticlesEntity(arc.getId(),src_id,date_ingested,Date.from(inst_published_date),false,false,hashLink);
+        articlesRepository.save(articleEntity);
+
+        return Mono.empty();
+
+
+        //ArticlesEntity articlesEntity = 
+
+
     }
 }

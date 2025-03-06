@@ -307,7 +307,7 @@ public class RssFeedService implements FeedService {
 
    // might need to subscribe, will see
 
-    public Flux<Article> fetchArticlesFromOpenCti(String s){
+    public Flux<ArticleData> fetchArticlesFromOpenCti(String s){
         LOGGER.info("in fetchArticlesFromOpenCti");
         String openCtiEndpoint = "/graphql";
         return 
@@ -317,20 +317,13 @@ public class RssFeedService implements FeedService {
                 .doOnNext(article->printArticle(article))// new object creation here
                 .filter(  // I have a flux of Article, I need to make sure the links aren't duplicated
                     article -> {
-                        return !detectDuplicateService.isDuplicateArticle(article.getLinkPrimary());
+                        return !detectDuplicateService.isDuplicateArticle(article.getLinkPrimary());// TODO maybe I need here the hashlink instead
                 })
-                // .flatMap(article -> {
-                //     transformIntoDbObjects(article);
-                // })
-                
-                
-                
-                
-                ;
+                .flatMap(article -> 
+                    dbService.transformIntoDbObjects(article)
+                );
                     
     }
-
-    //public 
 
     private void printArticle(Article arc) {
         LOGGER.info("Converted NEW article with id {}",arc.getId());

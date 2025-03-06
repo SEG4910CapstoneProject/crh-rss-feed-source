@@ -18,6 +18,6 @@ public interface FeedService {
 
 
 
-    Flux<Article> fetchArticlesFromOpenCti(String s);
+    Flux<ArticleData> fetchArticlesFromOpenCti(String s);
     void  printArticles(ArticlePrimary article);
 }

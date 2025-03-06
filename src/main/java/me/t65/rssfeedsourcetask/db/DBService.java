@@ -2,7 +2,10 @@ package me.t65.rssfeedsourcetask.db;
 
 import java.time.Instant;
 
+import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
+import me.t65.rssfeedsourcetask.dto.Article;
 import me.t65.rssfeedsourcetask.feed.ArticleData;
+import reactor.core.publisher.Mono;
 
 public interface DBService {
     boolean save(ArticleData articleData);
@@ -11,4 +14,5 @@ public interface DBService {
 
     String getLastVersionUpdateTime();
     boolean saveVersion(Instant utcDate);
+    Mono<ArticleData> transformIntoDbObjects(Article arc);
 }
