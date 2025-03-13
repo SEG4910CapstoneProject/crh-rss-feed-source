@@ -1,16 +1,22 @@
 package me.t65.rssfeedsourcetask.db;
 
 import me.t65.rssfeedsourcetask.db.mongo.repository.ArticleContentRepository;
+import me.t65.rssfeedsourcetask.db.postgres.entities.ArticleRelatedLinkEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
+import me.t65.rssfeedsourcetask.db.postgres.entities.LabelsEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.OpenCtiSourcesEntity;
+import me.t65.rssfeedsourcetask.db.postgres.entities.RelatedLinkEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.SourcesEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.VersionsEntity;
 import me.t65.rssfeedsourcetask.db.postgres.repository.ArticlesRepository;
+import me.t65.rssfeedsourcetask.db.postgres.repository.LabelsRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.OpenCtiRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.SourcesRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.VersionsRepository;
 import me.t65.rssfeedsourcetask.dedupe.NormalizeLinks;
 import me.t65.rssfeedsourcetask.dto.Article;
+import me.t65.rssfeedsourcetask.dto.RelatedLink;
+import me.t65.rssfeedsourcetask.emitter.DBEmitter;
 import me.t65.rssfeedsourcetask.feed.ArticleData;
 import me.t65.rssfeedsourcetask.utils.DateUtilsService;
 import reactor.core.publisher.Mono;
@@ -19,13 +25,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import aj.org.objectweb.asm.Label;
+
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class DBServiceImpl implements DBService {
+
+    private final DBEmitter DBEmitter;
     private static final Logger LOGGER = LoggerFactory.getLogger(DBServiceImpl.class);
 
     private final ArticlesRepository articlesRepository;
@@ -36,6 +48,7 @@ public class DBServiceImpl implements DBService {
     private final DateUtilsService dateUtilsService;
     private final VersionsRepository versionsRepository;
     private final OpenCtiRepository openCtiRepository;
+    private final LabelsRepository labelsRepository;
 
     public DBServiceImpl(
             ArticlesRepository articlesRepository,
@@ -43,13 +56,16 @@ public class DBServiceImpl implements DBService {
             SourcesRepository sourcesRepository,
             DateUtilsService dateUtilsService,
             VersionsRepository versionsRepository,
-            OpenCtiRepository openCtiRepository ) {
+            OpenCtiRepository openCtiRepository,
+            LabelsRepository labelsRepository, DBEmitter DBEmitter) {
         this.articlesRepository = articlesRepository;
         this.articleContentRepository = articleContentRepository;
         this.sourcesRepository = sourcesRepository;
         this.dateUtilsService = dateUtilsService;
         this.versionsRepository = versionsRepository;
         this.openCtiRepository = openCtiRepository;
+        this.labelsRepository = labelsRepository;
+        this.DBEmitter = DBEmitter;
     }
 
     @Override
@@ -125,7 +141,45 @@ public class DBServiceImpl implements DBService {
         long hashLink = NormalizeLinks.normalizeAndHashLink(arc.getLinkPrimary());
         Instant inst_published_date = Instant.parse(arc.getDatePublished());
         ArticlesEntity articleEntity = new ArticlesEntity(arc.getId(),src_id,date_ingested,Date.from(inst_published_date),false,false,hashLink);
-        articlesRepository.save(articleEntity);
+        OpenCtiSourcesEntity src_related_link_entity;
+        int src_related_link_id;
+        RelatedLinkEntity arcRelLinkEntity = new RelatedLinkEntity();
+        ArticleRelatedLinkEntity articleRelatedLinkEntity = new ArticleRelatedLinkEntity();
+        List<ArticleRelatedLinkEntity> article_rel_links_mappings = new ArrayList<>();
+        List<RelatedLinkEntity> rel_links = new ArrayList<>();
+
+        for (RelatedLink relLink : arc.getRelLinks()) {
+            // construct the object RelatedLinkEntity first
+            src_related_link_entity = openCtiRepository.findIdBySourceName(relLink.getSource());
+            src_related_link_id = src_related_link_entity.getSourceId();
+
+            arcRelLinkEntity.setRelatedHashLink(NormalizeLinks.normalizeAndHashLink(relLink.getRelatedLink()));
+            arcRelLinkEntity.setSourceId(src_related_link_id);// here we are done constructing the RelatedLinkEntity
+
+            articleRelatedLinkEntity.setArticleId(arc.getId());
+            articleRelatedLinkEntity.setRelLinkId(src_related_link_id);// here we are done constructing the articleRelatedLinkEntity
+
+            // Now you just have to make a big object that tracks all the objects created so far, and add the arcRelLinkEntity and articleRelatedLinkEntity to a list in there.
+            article_rel_links_mappings.add(articleRelatedLinkEntity);
+            rel_links.add(arcRelLinkEntity);    
+        }
+
+        int label_id;
+
+        for (String label : arc.getLabels()) {
+            LabelsEntity label_entity = labelsRepository.findByLabelName(label);
+            if ( label_entity != null ) {
+                // meaning the label is alr present
+                label_id = label_entity.getLabelId();
+                
+                
+
+            }
+            
+        }
+
+
+        //articlesRepository.save(articleEntity);
 
         return Mono.empty();
 

@@ -1,7 +1,5 @@
 package me.t65.rssfeedsourcetask.db.postgres.entities;
 
-import java.time.Instant;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,20 +9,23 @@ import jakarta.persistence.Table;
 
 @lombok.AllArgsConstructor
 @lombok.NoArgsConstructor
+@lombok.ToString
 @lombok.EqualsAndHashCode
 @lombok.Getter
 @lombok.Setter
 @Entity
 
-@Table(name = "versions")
-public class VersionsEntity {
+@Table(name = "related_links")
+public class RelatedLinkEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "version_id", columnDefinition = "SERIAL")
-    private int versionId;
+    @Column(name = "rel_link_id", columnDefinition = "SERIAL")
+    private int relLinkId;
 
-    @Column(name = "time_update")
-    private Instant timeUpdate;
+    @Column(name = "related_hash_link")
+    private long relatedHashLink;
 
+    @Column(name = "source_ID")
+    private int sourceId;
 
 }
