@@ -1,5 +1,6 @@
 package me.t65.rssfeedsourcetask.feed;
 
+import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
 import me.t65.rssfeedsourcetask.dto.Article;
 import me.t65.rssfeedsourcetask.dto.ArticlePrimary;
 import reactor.core.publisher.Flux;
@@ -18,6 +19,6 @@ public interface FeedService {
 
 
 
-    Flux<ArticleData> fetchArticlesFromOpenCti(String s);
+    Flux<ArticleDataMain> fetchArticlesFromOpenCti(String s);
     void  printArticles(ArticlePrimary article);
 }

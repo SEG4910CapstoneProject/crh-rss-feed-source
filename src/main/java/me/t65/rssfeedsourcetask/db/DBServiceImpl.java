@@ -1,6 +1,10 @@
 package me.t65.rssfeedsourcetask.db;
-
+import me.t65.rssfeedsourcetask.config.Config;
+import me.t65.rssfeedsourcetask.db.mongo.ArticleContentEntity;
+import me.t65.rssfeedsourcetask.db.mongo.RelatedLinkEntityContent;
 import me.t65.rssfeedsourcetask.db.mongo.repository.ArticleContentRepository;
+import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
+import me.t65.rssfeedsourcetask.db.postgres.entities.ArticleLabelEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticleRelatedLinkEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.LabelsEntity;
@@ -37,6 +41,8 @@ import java.util.Optional;
 @Service
 public class DBServiceImpl implements DBService {
 
+    private final Config config;
+
     private final DBEmitter DBEmitter;
     private static final Logger LOGGER = LoggerFactory.getLogger(DBServiceImpl.class);
 
@@ -57,7 +63,7 @@ public class DBServiceImpl implements DBService {
             DateUtilsService dateUtilsService,
             VersionsRepository versionsRepository,
             OpenCtiRepository openCtiRepository,
-            LabelsRepository labelsRepository, DBEmitter DBEmitter) {
+            LabelsRepository labelsRepository, DBEmitter DBEmitter, Config config) {
         this.articlesRepository = articlesRepository;
         this.articleContentRepository = articleContentRepository;
         this.sourcesRepository = sourcesRepository;
@@ -66,6 +72,7 @@ public class DBServiceImpl implements DBService {
         this.openCtiRepository = openCtiRepository;
         this.labelsRepository = labelsRepository;
         this.DBEmitter = DBEmitter;
+        this.config = config;
     }
 
     @Override
@@ -129,7 +136,7 @@ public class DBServiceImpl implements DBService {
         }
     }
 
-    public Mono<ArticleData> transformIntoDbObjects(Article arc) {
+    public Mono<ArticleDataMain> transformIntoDbObjects(Article arc) {
         // first, I need to get the source of this article and go 
         // to the open cti sources to actually get the source id
         OpenCtiSourcesEntity src_entity = openCtiRepository.findIdBySourceName(arc.getSource());
@@ -140,13 +147,23 @@ public class DBServiceImpl implements DBService {
         // TODO, in the database, the date_published is a date, how will this translate to a date (I have a timestamp with zone type)
         long hashLink = NormalizeLinks.normalizeAndHashLink(arc.getLinkPrimary());
         Instant inst_published_date = Instant.parse(arc.getDatePublished());
-        ArticlesEntity articleEntity = new ArticlesEntity(arc.getId(),src_id,date_ingested,Date.from(inst_published_date),false,false,hashLink);
+        ArticlesEntity articleEntity = new ArticlesEntity(arc.getId(),src_id,date_ingested,Date.from(inst_published_date),false,false,hashLink); // 1- article
         OpenCtiSourcesEntity src_related_link_entity;
         int src_related_link_id;
         RelatedLinkEntity arcRelLinkEntity = new RelatedLinkEntity();
         ArticleRelatedLinkEntity articleRelatedLinkEntity = new ArticleRelatedLinkEntity();
-        List<ArticleRelatedLinkEntity> article_rel_links_mappings = new ArrayList<>();
-        List<RelatedLinkEntity> rel_links = new ArrayList<>();
+        List<ArticleRelatedLinkEntity> article_rel_links_mappings = new ArrayList<>(); // 2- Article-RelatedLink
+        List<RelatedLinkEntity> rel_links = new ArrayList<>(); // 3- RelatedLinks
+        List<ArticleLabelEntity> article_label_mappings = new ArrayList<>();// 4- Article-Label-Entity
+        List<LabelsEntity> labels = new ArrayList<>();// 5- labels
+
+        Date date_of_publication = dateUtilsService.transformStringToDate(arc.getDatePublished());
+
+        ArticleContentEntity articleContentEntity = new ArticleContentEntity(arc.getId(),arc.getLinkPrimary(),arc.getName(),date_of_publication,arc.getDescription()); // 6- articleContent
+        RelatedLinkEntityContent related_link_content = new RelatedLinkEntityContent();// 7- RelatedLinkEntityContent
+        related_link_content.setId(arc.getId());
+        List<String> relLinksContent = new ArrayList<>();// this is to set the related_link_content array
+        
 
         for (RelatedLink relLink : arc.getRelLinks()) {
             // construct the object RelatedLinkEntity first
@@ -155,6 +172,8 @@ public class DBServiceImpl implements DBService {
 
             arcRelLinkEntity.setRelatedHashLink(NormalizeLinks.normalizeAndHashLink(relLink.getRelatedLink()));
             arcRelLinkEntity.setSourceId(src_related_link_id);// here we are done constructing the RelatedLinkEntity
+            relLinksContent.add(relLink.getRelatedLink());
+
 
             articleRelatedLinkEntity.setArticleId(arc.getId());
             articleRelatedLinkEntity.setRelLinkId(src_related_link_id);// here we are done constructing the articleRelatedLinkEntity
@@ -165,23 +184,37 @@ public class DBServiceImpl implements DBService {
         }
 
         int label_id;
+        LabelsEntity label_entity;
+        ArticleLabelEntity article_label_entity;
 
         for (String label : arc.getLabels()) {
-            LabelsEntity label_entity = labelsRepository.findByLabelName(label);
+            label_entity = labelsRepository.findByLabelName(label);
             if ( label_entity != null ) {
-                // meaning the label is alr present
+                // meaning the label is alr present in the table
                 label_id = label_entity.getLabelId();
-                
-                
-
+                article_label_entity = new ArticleLabelEntity(arc.getId(),label_id);// we just need to construct the ArticleLabelEntity in this case
+                article_label_mappings.add(article_label_entity);
+            } else {
+                // meaning a new label was encountered
+                // first, create the labelEntity
+                label_entity = new LabelsEntity();
+                label_entity.setLabelName(label);
+                labels.add(label_entity);
+                // then go construct the Article_Label_entity
+                article_label_entity = new ArticleLabelEntity(arc.getId(),label_entity.getLabelId());
+                article_label_mappings.add(article_label_entity);
             }
             
         }
 
+        related_link_content.setLinks(relLinksContent);
+
+        ArticleDataMain mainEntity = new  ArticleDataMain(articleEntity, article_rel_links_mappings, rel_links, article_label_mappings, labels, articleContentEntity,related_link_content);
+
 
         //articlesRepository.save(articleEntity);
 
-        return Mono.empty();
+        return Mono.just(mainEntity);
 
 
         //ArticlesEntity articlesEntity = 
