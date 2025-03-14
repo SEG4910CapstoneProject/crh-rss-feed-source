@@ -12,6 +12,7 @@ import com.rometools.rome.io.XmlReader;
 import me.t65.rssfeedsourcetask.config.Config;
 import me.t65.rssfeedsourcetask.db.DBService;
 import me.t65.rssfeedsourcetask.db.mongo.ArticleContentEntity;
+import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticlesEntity;
 import me.t65.rssfeedsourcetask.dedupe.DetectDuplicateService;
 import me.t65.rssfeedsourcetask.dedupe.NormalizeLinks;
@@ -307,7 +308,7 @@ public class RssFeedService implements FeedService {
 
    // might need to subscribe, will see
 
-    public Flux<ArticleData> fetchArticlesFromOpenCti(String s){
+    public Flux<ArticleDataMain> fetchArticlesFromOpenCti(String s){
         LOGGER.info("in fetchArticlesFromOpenCti");
         String openCtiEndpoint = "/graphql";
         return 
