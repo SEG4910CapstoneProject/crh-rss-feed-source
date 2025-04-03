@@ -1,10 +1,8 @@
 package me.t65.rssfeedsourcetask.feed;
 
 import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
-import me.t65.rssfeedsourcetask.dto.Article;
 import me.t65.rssfeedsourcetask.dto.ArticlePrimary;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /** Service that reads some data feed */
 public interface FeedService {

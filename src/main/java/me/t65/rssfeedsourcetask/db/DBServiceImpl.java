@@ -1,8 +1,11 @@
 package me.t65.rssfeedsourcetask.db;
 import me.t65.rssfeedsourcetask.config.Config;
 import me.t65.rssfeedsourcetask.db.mongo.ArticleContentEntity;
-import me.t65.rssfeedsourcetask.db.mongo.RelatedLinkEntityContent;
+import me.t65.rssfeedsourcetask.db.mongo.RelatedLinkContentEntity;
 import me.t65.rssfeedsourcetask.db.mongo.repository.ArticleContentRepository;
+import me.t65.rssfeedsourcetask.db.mongo.repository.RelatedLinkContentRepository;
+import me.t65.rssfeedsourcetask.db.postgres.composite_keys.ArticleLabelId;
+import me.t65.rssfeedsourcetask.db.postgres.composite_keys.ArticleRelatedLinkId;
 import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticleLabelEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.ArticleRelatedLinkEntity;
@@ -12,27 +15,28 @@ import me.t65.rssfeedsourcetask.db.postgres.entities.OpenCtiSourcesEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.RelatedLinkEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.SourcesEntity;
 import me.t65.rssfeedsourcetask.db.postgres.entities.VersionsEntity;
+import me.t65.rssfeedsourcetask.db.postgres.repository.ArticleLabelRepository;
+import me.t65.rssfeedsourcetask.db.postgres.repository.ArticleRelatedLinkRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.ArticlesRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.LabelsRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.OpenCtiRepository;
+import me.t65.rssfeedsourcetask.db.postgres.repository.RelatedLinkRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.SourcesRepository;
 import me.t65.rssfeedsourcetask.db.postgres.repository.VersionsRepository;
+import me.t65.rssfeedsourcetask.dedupe.DetectDuplicateServiceImpl;
 import me.t65.rssfeedsourcetask.dedupe.NormalizeLinks;
 import me.t65.rssfeedsourcetask.dto.Article;
 import me.t65.rssfeedsourcetask.dto.RelatedLink;
-import me.t65.rssfeedsourcetask.emitter.DBEmitter;
-import me.t65.rssfeedsourcetask.feed.ArticleData;
 import me.t65.rssfeedsourcetask.utils.DateUtilsService;
+import me.t65.rssfeedsourcetask.utils.DateUtilsServiceImpl;
 import reactor.core.publisher.Mono;
-
+import reactor.util.retry.RetryBackoffSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import aj.org.objectweb.asm.Label;
 
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -41,9 +45,15 @@ import java.util.Optional;
 @Service
 public class DBServiceImpl implements DBService {
 
+    private final RetryBackoffSpec feedRetrySpec;
+
+    private final DetectDuplicateServiceImpl detectDuplicateServiceImpl;
+
+    private final DateUtilsServiceImpl dateUtilsServiceImpl;
+
     private final Config config;
 
-    private final DBEmitter DBEmitter;
+    //private final DBEmitter DBEmitter;
     private static final Logger LOGGER = LoggerFactory.getLogger(DBServiceImpl.class);
 
     private final ArticlesRepository articlesRepository;
@@ -55,6 +65,10 @@ public class DBServiceImpl implements DBService {
     private final VersionsRepository versionsRepository;
     private final OpenCtiRepository openCtiRepository;
     private final LabelsRepository labelsRepository;
+    private final RelatedLinkRepository relatedLinkRepository;
+    private final ArticleRelatedLinkRepository articleRelatedLinkRepository;
+    private final ArticleLabelRepository articleLabelRepository;
+    private final RelatedLinkContentRepository relatedLinkContentRepository;
 
     public DBServiceImpl(
             ArticlesRepository articlesRepository,
@@ -63,7 +77,13 @@ public class DBServiceImpl implements DBService {
             DateUtilsService dateUtilsService,
             VersionsRepository versionsRepository,
             OpenCtiRepository openCtiRepository,
-            LabelsRepository labelsRepository, DBEmitter DBEmitter, Config config) {
+            LabelsRepository labelsRepository, 
+            RelatedLinkRepository relatedLinkRepository,
+            ArticleRelatedLinkRepository articleRelatedLinkRepository,
+            ArticleLabelRepository articleLabelRepository,
+            RelatedLinkContentRepository relatedLinkContentRepository,
+            //DBEmitter DBEmitter,
+             Config config, DateUtilsServiceImpl dateUtilsServiceImpl, DetectDuplicateServiceImpl detectDuplicateServiceImpl, RetryBackoffSpec feedRetrySpec) {
         this.articlesRepository = articlesRepository;
         this.articleContentRepository = articleContentRepository;
         this.sourcesRepository = sourcesRepository;
@@ -71,12 +91,19 @@ public class DBServiceImpl implements DBService {
         this.versionsRepository = versionsRepository;
         this.openCtiRepository = openCtiRepository;
         this.labelsRepository = labelsRepository;
-        this.DBEmitter = DBEmitter;
+        this.relatedLinkRepository = relatedLinkRepository;
+        this.articleRelatedLinkRepository = articleRelatedLinkRepository;
+        this.articleLabelRepository = articleLabelRepository;
+        this.relatedLinkContentRepository = relatedLinkContentRepository;
+        //this.DBEmitter = DBEmitter;
         this.config = config;
+        this.dateUtilsServiceImpl = dateUtilsServiceImpl;
+        this.detectDuplicateServiceImpl = detectDuplicateServiceImpl;
+        this.feedRetrySpec = feedRetrySpec;
     }
 
     @Override
-    public boolean save(ArticleData articleData) {
+    public boolean save(ArticleDataMain articleData) {
         try {
             saveRaw(articleData);
             return true;
@@ -86,9 +113,48 @@ public class DBServiceImpl implements DBService {
         }
     }
 
-    private void saveRaw(ArticleData articleData) {
-        articlesRepository.save(articleData.getArticlesEntity());
-        articleContentRepository.save(articleData.getArticleContentEntity());
+    private void saveRaw(ArticleDataMain articleData) {
+        // 1- save the article entity to the articles table
+        articlesRepository.save(articleData.getArticle());
+
+        // 2- save the related link
+        
+        for (RelatedLinkEntity relatedLinkEntity : articleData.getRelated_links()) {
+            relatedLinkRepository.save(relatedLinkEntity);
+        }
+
+
+        // 3- save the article_related_link mapping
+        for (ArticleRelatedLinkEntity article_related_link : articleData.getArticle_rel_links_mappings()) {
+            articleRelatedLinkRepository.save(article_related_link);
+        }
+
+        // 4- save the labels
+
+        for (LabelsEntity label : articleData.getLabels()) {
+            labelsRepository.save(label);
+        }
+
+        // TODO ANA
+
+        // 5- save the article_label_mappings
+
+        // try {
+        //     for (ArticleLabelEntity article_label_mapping : articleData.getArticle_label_mappings()) {
+        //         articleLabelRepository.save(article_label_mapping);
+        //         LOGGER.info("the article label is: {},{}",article_label_mapping.getId().getArticleId(),article_label_mapping.getId().getLabelId());
+        //     }
+        // } catch(Exception e) {
+        //     LOGGER.info("HERE ERROR");
+        //     System.exit(1);
+        // }
+
+ 
+        // 6- save the article content entity
+
+        articleContentRepository.save(articleData.getArticle_content());
+        // // 7- save the RelatedLinkContent
+        // relatedLinkContentRepository.save(articleData.getRel_links_content());
     }
 
     /**
@@ -160,9 +226,11 @@ public class DBServiceImpl implements DBService {
         Date date_of_publication = dateUtilsService.transformStringToDate(arc.getDatePublished());
 
         ArticleContentEntity articleContentEntity = new ArticleContentEntity(arc.getId(),arc.getLinkPrimary(),arc.getName(),date_of_publication,arc.getDescription()); // 6- articleContent
-        RelatedLinkEntityContent related_link_content = new RelatedLinkEntityContent();// 7- RelatedLinkEntityContent
+        RelatedLinkContentEntity related_link_content = new RelatedLinkContentEntity();// 7- RelatedLinkEntityContent
         related_link_content.setId(arc.getId());
         List<String> relLinksContent = new ArrayList<>();// this is to set the related_link_content array
+
+        ArticleRelatedLinkId article_related_link_id;
         
 
         for (RelatedLink relLink : arc.getRelLinks()) {
@@ -174,9 +242,10 @@ public class DBServiceImpl implements DBService {
             arcRelLinkEntity.setSourceId(src_related_link_id);// here we are done constructing the RelatedLinkEntity
             relLinksContent.add(relLink.getRelatedLink());
 
-
-            articleRelatedLinkEntity.setArticleId(arc.getId());
-            articleRelatedLinkEntity.setRelLinkId(src_related_link_id);// here we are done constructing the articleRelatedLinkEntity
+            article_related_link_id = new ArticleRelatedLinkId(arc.getId(),src_related_link_id);
+            articleRelatedLinkEntity.setId(article_related_link_id);// here we are done constructing the articleRelatedLinkEntity
+            // articleRelatedLinkEntity.setArticleId();
+            // articleRelatedLinkEntity.setRelLinkId();
 
             // Now you just have to make a big object that tracks all the objects created so far, and add the arcRelLinkEntity and articleRelatedLinkEntity to a list in there.
             article_rel_links_mappings.add(articleRelatedLinkEntity);
@@ -187,25 +256,38 @@ public class DBServiceImpl implements DBService {
         LabelsEntity label_entity;
         ArticleLabelEntity article_label_entity;
 
-        for (String label : arc.getLabels()) {
-            label_entity = labelsRepository.findByLabelName(label);
-            if ( label_entity != null ) {
-                // meaning the label is alr present in the table
-                label_id = label_entity.getLabelId();
-                article_label_entity = new ArticleLabelEntity(arc.getId(),label_id);// we just need to construct the ArticleLabelEntity in this case
-                article_label_mappings.add(article_label_entity);
-            } else {
-                // meaning a new label was encountered
-                // first, create the labelEntity
-                label_entity = new LabelsEntity();
-                label_entity.setLabelName(label);
-                labels.add(label_entity);
-                // then go construct the Article_Label_entity
-                article_label_entity = new ArticleLabelEntity(arc.getId(),label_entity.getLabelId());
-                article_label_mappings.add(article_label_entity);
-            }
+        ArticleLabelId article_label_id;
+
+        //TODO ANA
+        // for (String label : arc.getLabels()) {
+        //     LOGGER.info("the label is: {}",label);
+        //     label_entity = labelsRepository.findByLabelName(label);
+        //     LOGGER.info("the label entity is: {}",label_entity);
+        //     if ( label_entity != null ) {
+        //         LOGGER.info("the label entity is 1: {}",label_entity.getLabelName());
+
+        //         // meaning the label is alr present in the table
+        //         label_id = label_entity.getLabelId();
+        //         article_label_id = new ArticleLabelId(arc.getId(),label_id);
+        //         article_label_entity = new ArticleLabelEntity(article_label_id);// we just need to construct the ArticleLabelEntity in this case
+        //         article_label_mappings.add(article_label_entity);
+        //     } else {
+
+        //         // meaning a new label was encountered
+        //         // first, create the labelEntity
+        //         label_entity = new LabelsEntity();
+        //         label_entity.setLabelName(label);
+        //         LOGGER.info("the label entity is 2: {}",label_entity.getLabelName());
+
+        //         labels.add(label_entity);
+        //         // then go construct the Article_Label_entity
+        //         article_label_id = new ArticleLabelId(arc.getId(), label_entity.getLabelId());
+
+        //         article_label_entity = new ArticleLabelEntity(article_label_id);
+        //         article_label_mappings.add(article_label_entity);
+        //     }
             
-        }
+        // }
 
         related_link_content.setLinks(relLinksContent);
 

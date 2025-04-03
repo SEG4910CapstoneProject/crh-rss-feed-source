@@ -71,6 +71,11 @@ public class RssFeedSourceTask implements ApplicationRunner {
         Mono.just("")
         .flatMapMany(feedService::fetchArticlesFromOpenCti) // ensures inner flux is subscribed to
         //.doOnNext(e->LOGGER.info("Finished pulling"))
+        .flatMap(this.emitterService::emitData)
+        .doOnError(error -> {
+            LOGGER.error("Critical error: {}", error.getMessage());
+            System.exit(1);
+        })
         .subscribeOn(scheduler)
         .collectList()
         .block();        

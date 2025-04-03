@@ -15,7 +15,7 @@ import lombok.Setter;
 @lombok.Getter
 @Setter
 @Document(collection = "relatedLinkContent")
-public class RelatedLinkEntityContent {
+public class RelatedLinkContentEntity {
     @Id
     private UUID id;
 

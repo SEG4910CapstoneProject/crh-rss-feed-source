@@ -6,7 +6,6 @@ import org.springframework.stereotype.Repository;
 import me.t65.rssfeedsourcetask.db.postgres.entities.LabelsEntity;
 
 @Repository
-
 public interface LabelsRepository extends JpaRepository<LabelsEntity,Integer> {
     LabelsEntity findByLabelName(String label);
 
