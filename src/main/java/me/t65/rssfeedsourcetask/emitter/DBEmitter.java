@@ -2,6 +2,7 @@ package me.t65.rssfeedsourcetask.emitter;
 
 import me.t65.rssfeedsourcetask.config.Config;
 import me.t65.rssfeedsourcetask.db.DBService;
+import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
 import me.t65.rssfeedsourcetask.feed.ArticleData;
 
 import org.slf4j.Logger;
@@ -32,7 +33,7 @@ public class DBEmitter implements EmitterService {
     }
 
     @Override
-    public Mono<Boolean> emitData(ArticleData dbObj) {
+    public Mono<Boolean> emitData(ArticleDataMain dbObj) {
         return Mono.just(dbObj)
                 .map(dbO -> dbService.save(dbObj))
                 .retryWhen(getRetrySpec(dbObj))
@@ -45,7 +46,7 @@ public class DBEmitter implements EmitterService {
      * @param dbObj The article data being processed
      * @return Retry Spec that logs before every retry
      */
-    private RetryBackoffSpec getRetrySpec(ArticleData dbObj) {
+    private RetryBackoffSpec getRetrySpec(ArticleDataMain dbObj) {
         return RetrySpec.fixedDelay(
                         config.getFeedMaxAttempts(),
                         Duration.ofMillis(config.getFeedRetryBackoffMillis()))

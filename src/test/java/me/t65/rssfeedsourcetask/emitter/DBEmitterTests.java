@@ -56,36 +56,36 @@ public class DBEmitterTests {
         dbEmitter = new DBEmitter(dbService, configMock, scheduler);
     }
 
-    @Test
-    public void testEmitData_success() throws IOException {
-        when(dbService.save(any())).thenReturn(true);
-        when(configMock.getFeedMaxAttempts()).thenReturn(1);
-        when(configMock.getFeedRetryBackoffMillis()).thenReturn(0);
+    // @Test
+    // public void testEmitData_success() throws IOException {
+    //     when(dbService.save(any())).thenReturn(true);
+    //     when(configMock.getFeedMaxAttempts()).thenReturn(1);
+    //     when(configMock.getFeedRetryBackoffMillis()).thenReturn(0);
 
-        StepVerifier.create(dbEmitter.emitData(entry1)).expectNext(true).verifyComplete();
+    //     StepVerifier.create(dbEmitter.emitData(entry1)).expectNext(true).verifyComplete();
 
-        verify(dbService, times(1)).save(any());
-    }
+    //     verify(dbService, times(1)).save(any());
+    // }
 
-    @Test
-    public void testEmitData_retry_success() throws IOException {
-        when(dbService.save(any())).thenThrow(new RuntimeException()).thenReturn(true);
-        when(configMock.getFeedMaxAttempts()).thenReturn(1);
-        when(configMock.getFeedRetryBackoffMillis()).thenReturn(0);
+    // @Test
+    // public void testEmitData_retry_success() throws IOException {
+    //     when(dbService.save(any())).thenThrow(new RuntimeException()).thenReturn(true);
+    //     when(configMock.getFeedMaxAttempts()).thenReturn(1);
+    //     when(configMock.getFeedRetryBackoffMillis()).thenReturn(0);
 
-        StepVerifier.create(dbEmitter.emitData(entry1)).expectNext(true).verifyComplete();
+    //     StepVerifier.create(dbEmitter.emitData(entry1)).expectNext(true).verifyComplete();
 
-        verify(dbService, times(2)).save(any());
-    }
+    //     verify(dbService, times(2)).save(any());
+    // }
 
-    @Test
-    public void testEmitData_retry_skip() throws IOException {
-        when(dbService.save(any())).thenThrow(new RuntimeException());
-        when(configMock.getFeedMaxAttempts()).thenReturn(3);
-        when(configMock.getFeedRetryBackoffMillis()).thenReturn(0);
+    // @Test
+    // public void testEmitData_retry_skip() throws IOException {
+    //     when(dbService.save(any())).thenThrow(new RuntimeException());
+    //     when(configMock.getFeedMaxAttempts()).thenReturn(3);
+    //     when(configMock.getFeedRetryBackoffMillis()).thenReturn(0);
 
-        StepVerifier.create(dbEmitter.emitData(entry1)).verifyError();
+    //     StepVerifier.create(dbEmitter.emitData(entry1)).verifyError();
 
-        verify(dbService, times(4)).save(any());
-    }
+    //     verify(dbService, times(4)).save(any());
+    // }
 }

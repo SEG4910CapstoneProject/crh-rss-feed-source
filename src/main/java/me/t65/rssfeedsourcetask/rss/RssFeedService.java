@@ -361,7 +361,7 @@ public class RssFeedService implements FeedService {
 
     }
 
-    // this method need to split the externalReferences array into single articles (each article need to have exactly one link, the res of links would go to 
+    // this method needs to split the externalReferences array into single articles (each article need to have exactly one link, the res of links would go to 
     // another object called RelatedLinks)
     // this method also writes the correct source name for articles coming from BleepingComputer (scan the link and overwrite the source by BleepingComputer instead of title of article)
     public Flux<Article> transformArticle(ArticlePrimary article) {
@@ -483,9 +483,9 @@ public class RssFeedService implements FeedService {
         .uri(url)
         .bodyValue(requestBody)
         .retrieve()
-        .bodyToFlux(JsonNode.class)// ArticlePrimary is NOT the object we save to the database, it just primarly
+        .bodyToFlux(JsonNode.class)
         .flatMap(json->Flux.fromIterable(json.get("data").get("reports").get("edges")))
-        .map(edge->objectMapper.convertValue(edge.get("node"),ArticlePrimary.class))
+        .map(edge->objectMapper.convertValue(edge.get("node"),ArticlePrimary.class))// ArticlePrimary is NOT the object we save to the database, it just primarly
         //.retryWhen(getRetrySpec("pulling articles from Open CTI"))
         //.then(saveVersionDate())
         .doOnNext(res->printArticles(res));// apparently this operates on every single article emitted by the flux, need to save this object now to the db instead of printing it
