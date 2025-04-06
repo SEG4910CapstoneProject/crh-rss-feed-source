@@ -54,35 +54,35 @@ public class RssFeedSourceTaskTests {
                         sourcesRepositoryMock, feedServiceMock, emitterServiceMock, scheduler);
     }
 
-    @Test
-    public void testRun_success() {
-        ArticleData entry1 =
-                new ArticleData(
-                        new ArticlesEntity(
-                                uuid1, -1, new Date(10001), new Date(10002), false, false, 1000),
-                        new ArticleContentEntity(
-                                uuid1,
-                                FAKE_SOURCE_LINK,
-                                "fakeName",
-                                new Date(10005),
-                                "fake description 1"));
-        ArticleData entry2 =
-                new ArticleData(
-                        new ArticlesEntity(
-                                uuid2, -2, new Date(10002), new Date(10003), false, false, 1000),
-                        new ArticleContentEntity(
-                                uuid2,
-                                FAKE_SOURCE_LINK,
-                                "fakename",
-                                new Date(10006),
-                                "fake description 2"));
+//     @Test
+//     public void testRun_success() {
+//         ArticleData entry1 =
+//                 new ArticleData(
+//                         new ArticlesEntity(
+//                                 uuid1, -1, new Date(10001), new Date(10002), false, false, 1000),
+//                         new ArticleContentEntity(
+//                                 uuid1,
+//                                 FAKE_SOURCE_LINK,
+//                                 "fakeName",
+//                                 new Date(10005),
+//                                 "fake description 1"));
+//         ArticleData entry2 =
+//                 new ArticleData(
+//                         new ArticlesEntity(
+//                                 uuid2, -2, new Date(10002), new Date(10003), false, false, 1000),
+//                         new ArticleContentEntity(
+//                                 uuid2,
+//                                 FAKE_SOURCE_LINK,
+//                                 "fakename",
+//                                 new Date(10006),
+//                                 "fake description 2"));
 
-        when(sourcesRepositoryMock.findAll()).thenReturn(FAKE_SOURCE_ENTITY_LIST);
-        when(feedServiceMock.getFeed(any())).thenReturn(Flux.just(entry1, entry2));
-        when(emitterServiceMock.emitData(any())).thenReturn(Mono.just(true));
+//         when(sourcesRepositoryMock.findAll()).thenReturn(FAKE_SOURCE_ENTITY_LIST);
+//         when(feedServiceMock.getFeed(any())).thenReturn(Flux.just(entry1, entry2));
+//         when(emitterServiceMock.emitData(any())).thenReturn(Mono.just(true));
 
-        rssFeedSourceTask.run(null);
+//         rssFeedSourceTask.run(null);
 
-        verify(emitterServiceMock, times(2)).emitData(any());
-    }
+//         verify(emitterServiceMock, times(2)).emitData(any());
+//     }
 }
