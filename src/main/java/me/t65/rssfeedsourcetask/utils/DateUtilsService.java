@@ -9,4 +9,6 @@ public interface DateUtilsService {
      * @return Date object of current date
      */
     Date getCurrentDate();
+
+    Date transformStringToDate(String date);
 }

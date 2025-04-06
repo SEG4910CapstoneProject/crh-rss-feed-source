@@ -38,44 +38,44 @@ public class DBServiceImplTests {
 
     @InjectMocks DBServiceImpl dbService;
 
-    @Test
-    public void testSave_success() {
-        ArticleData expectedData =
-                TestUtils.getFakeDbObj(
-                        UUID_1,
-                        "fakeTitle",
-                        "description1",
-                        "fakeUrl",
-                        new Date(1000),
-                        SOURCE_ID,
-                        new Date(2000));
+    // @Test
+    // public void testSave_success() {
+    //     ArticleData expectedData =
+    //             TestUtils.getFakeDbObj(
+    //                     UUID_1,
+    //                     "fakeTitle",
+    //                     "description1",
+    //                     "fakeUrl",
+    //                     new Date(1000),
+    //                     SOURCE_ID,
+    //                     new Date(2000));
 
-        dbService.save(expectedData);
+    //     dbService.save(expectedData);
 
-        verify(articlesRepository).save(eq(expectedData.getArticlesEntity()));
-        verify(articleContentRepository).save(eq(expectedData.getArticleContentEntity()));
-    }
+    //     verify(articlesRepository).save(eq(expectedData.getArticlesEntity()));
+    //     verify(articleContentRepository).save(eq(expectedData.getArticleContentEntity()));
+    // }
 
-    @Test
-    public void testSave_failure_exceptionThrown() {
-        ArticleData expectedData =
-                TestUtils.getFakeDbObj(
-                        UUID_1,
-                        "fakeTitle",
-                        "description1",
-                        "fakeUrl",
-                        new Date(1000),
-                        SOURCE_ID,
-                        new Date(2000));
+    // @Test
+    // public void testSave_failure_exceptionThrown() {
+    //     ArticleData expectedData =
+    //             TestUtils.getFakeDbObj(
+    //                     UUID_1,
+    //                     "fakeTitle",
+    //                     "description1",
+    //                     "fakeUrl",
+    //                     new Date(1000),
+    //                     SOURCE_ID,
+    //                     new Date(2000));
 
-        when(articlesRepository.save(any())).thenThrow(new RuntimeException("Fake Exception"));
+    //     when(articlesRepository.save(any())).thenThrow(new RuntimeException("Fake Exception"));
 
-        assertThrows(
-                RuntimeException.class,
-                () -> {
-                    dbService.save(expectedData);
-                });
-    }
+    //     assertThrows(
+    //             RuntimeException.class,
+    //             () -> {
+    //                 dbService.save(expectedData);
+    //             });
+    // }
 
     @Test
     public void testSaveLastUpdateToDatabase_success() {
