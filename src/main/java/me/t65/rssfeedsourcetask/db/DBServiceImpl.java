@@ -53,7 +53,6 @@ public class DBServiceImpl implements DBService {
 
     private final Config config;
 
-    //private final DBEmitter DBEmitter;
     private static final Logger LOGGER = LoggerFactory.getLogger(DBServiceImpl.class);
 
     private final ArticlesRepository articlesRepository;
@@ -82,7 +81,6 @@ public class DBServiceImpl implements DBService {
             ArticleRelatedLinkRepository articleRelatedLinkRepository,
             ArticleLabelRepository articleLabelRepository,
             RelatedLinkContentRepository relatedLinkContentRepository,
-            //DBEmitter DBEmitter,
              Config config, DateUtilsServiceImpl dateUtilsServiceImpl, DetectDuplicateServiceImpl detectDuplicateServiceImpl, RetryBackoffSpec feedRetrySpec) {
         this.articlesRepository = articlesRepository;
         this.articleContentRepository = articleContentRepository;
@@ -95,7 +93,6 @@ public class DBServiceImpl implements DBService {
         this.articleRelatedLinkRepository = articleRelatedLinkRepository;
         this.articleLabelRepository = articleLabelRepository;
         this.relatedLinkContentRepository = relatedLinkContentRepository;
-        //this.DBEmitter = DBEmitter;
         this.config = config;
         this.dateUtilsServiceImpl = dateUtilsServiceImpl;
         this.detectDuplicateServiceImpl = detectDuplicateServiceImpl;
@@ -135,7 +132,7 @@ public class DBServiceImpl implements DBService {
             labelsRepository.save(label);
         }
 
-        // TODO ANA
+        // TODO There is a bug here, it is going to get solved asap
 
         // 5- save the article_label_mappings
 
@@ -202,15 +199,20 @@ public class DBServiceImpl implements DBService {
         }
     }
 
+    /**
+     * Takes an object and transforms it into a new one ready for database persistence
+     *
+     * @param arc article to be trasformed
+     * @return a mono containing the newest object
+     */
+
     public Mono<ArticleDataMain> transformIntoDbObjects(Article arc) {
         // first, I need to get the source of this article and go 
         // to the open cti sources to actually get the source id
         OpenCtiSourcesEntity src_entity = openCtiRepository.findIdBySourceName(arc.getSource());
 
         int src_id = src_entity.getSourceId();
-        //LOGGER.info("the src is is: {}",src_id);
         Date date_ingested = dateUtilsService.getCurrentDate();
-        // TODO, in the database, the date_published is a date, how will this translate to a date (I have a timestamp with zone type)
         long hashLink = NormalizeLinks.normalizeAndHashLink(arc.getLinkPrimary());
         Instant inst_published_date = Instant.parse(arc.getDatePublished());
         ArticlesEntity articleEntity = new ArticlesEntity(arc.getId(),src_id,date_ingested,Date.from(inst_published_date),false,false,hashLink); // 1- article
@@ -244,8 +246,6 @@ public class DBServiceImpl implements DBService {
 
             article_related_link_id = new ArticleRelatedLinkId(arc.getId(),src_related_link_id);
             articleRelatedLinkEntity.setId(article_related_link_id);// here we are done constructing the articleRelatedLinkEntity
-            // articleRelatedLinkEntity.setArticleId();
-            // articleRelatedLinkEntity.setRelLinkId();
 
             // Now you just have to make a big object that tracks all the objects created so far, and add the arcRelLinkEntity and articleRelatedLinkEntity to a list in there.
             article_rel_links_mappings.add(articleRelatedLinkEntity);
@@ -258,7 +258,7 @@ public class DBServiceImpl implements DBService {
 
         ArticleLabelId article_label_id;
 
-        //TODO ANA
+        // TODO A bug here, this will get solved
         // for (String label : arc.getLabels()) {
         //     LOGGER.info("the label is: {}",label);
         //     label_entity = labelsRepository.findByLabelName(label);
@@ -293,14 +293,6 @@ public class DBServiceImpl implements DBService {
 
         ArticleDataMain mainEntity = new  ArticleDataMain(articleEntity, article_rel_links_mappings, rel_links, article_label_mappings, labels, articleContentEntity,related_link_content);
 
-
-        //articlesRepository.save(articleEntity);
-
         return Mono.just(mainEntity);
-
-
-        //ArticlesEntity articlesEntity = 
-
-
     }
 }

@@ -27,15 +27,8 @@ import me.t65.rssfeedsourcetask.utils.DateUtilsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import reactor.core.Exceptions;
@@ -68,7 +61,6 @@ import java.util.stream.IntStream;
 public class RssFeedService implements FeedService {
     private static final Logger LOGGER = LoggerFactory.getLogger(RssFeedService.class);
 
-    //private final RestTemplate restTemplate;
     private final WebClient webClient;
     private final Config config;
     private final RssIdGenerator rssIdGenerator;
@@ -91,7 +83,6 @@ public class RssFeedService implements FeedService {
             DetectDuplicateService detectDuplicateService,
             Scheduler scheduler,
             ObjectMapper objectMapper) {
-        //this.restTemplate = restTemplate;
         this.webClient = webClient;
         this.config = config;
         this.rssIdGenerator = rssIdGenerator;
@@ -306,7 +297,13 @@ public class RssFeedService implements FeedService {
     }
 
 
-   // might need to subscribe, will see
+
+    /**
+     * Get processed articles as a flux
+     *
+     * @param s empty parameter to start the flux
+     * @return Flux containing stream of articles processed after being pulled from open cti
+     */
 
     public Flux<ArticleDataMain> fetchArticlesFromOpenCti(String s){
         LOGGER.info("in fetchArticlesFromOpenCti");
@@ -318,13 +315,20 @@ public class RssFeedService implements FeedService {
                 .doOnNext(article->printArticle(article))// new object creation here
                 .filter(  // I have a flux of Article, I need to make sure the links aren't duplicated
                     article -> {
-                        return !detectDuplicateService.isDuplicateArticle(article.getLinkPrimary());// TODO maybe I need here the hashlink instead
+                        return !detectDuplicateService.isDuplicateArticle(article.getLinkPrimary());// TODO, smarter detection needed (using an AI)
                 })
                 .flatMap(article -> 
                     dbService.transformIntoDbObjects(article)
                 );
                     
     }
+
+    /**
+     * print articles for debugging purposes
+     *
+     * @param arc article to be printed
+     * @return void
+     */
 
     private void printArticle(Article arc) {
         LOGGER.info("Converted NEW article with id {}",arc.getId());
@@ -341,11 +345,6 @@ public class RssFeedService implements FeedService {
 
         LOGGER.info("The object labels are: ");
 
-        // List<String> labels = arc.getLabels().stream().map((label)->{
-        //     LOGGER.info("The label is: {}",label);
-        //     return label;
-        // }).toList();
-
         arc.getLabels().stream().map((label)->{
             LOGGER.info("The label is: {}",label);
             return label;
@@ -361,16 +360,18 @@ public class RssFeedService implements FeedService {
 
     }
 
-    // this method needs to split the externalReferences array into single articles (each article need to have exactly one link, the res of links would go to 
-    // another object called RelatedLinks)
-    // this method also writes the correct source name for articles coming from BleepingComputer (scan the link and overwrite the source by BleepingComputer instead of title of article)
+    /**
+     * this method needs to split the externalReferences array into single articles (each article need to have exactly one link, the rest of links would go to 
+       another object called RelatedLinks)
+     * this method also writes the correct source name for articles coming from BleepingComputer (scan the link and overwrite the source by BleepingComputer instead of title of article)
+     * @param article raw article pulled from the open cti
+     * @return Flux containing stream of articles processed after being pulled from open cti
+     */
     public Flux<Article> transformArticle(ArticlePrimary article) {
         Article arc;
         UUID id = rssIdGenerator.generateId();
-        //String src;
-        //String linkPrimary;
         List<Edges> resources = article.getExternalReferences().getEdges();
-        int indexPrimary = detectPrimaryLink(resources);
+        int indexPrimary = detectPrimaryLink(resources);// sometimes we have a lot of links for a single incident, we need to detect the primary one, the rest would go to another table
         String src = resources.get(indexPrimary).getNode().getSource();// the source of the primary article
         String linkPrimary = resources.get(indexPrimary).getNode().getUrl();
         List<RelatedLink> relLinks = new ArrayList<>();
@@ -388,14 +389,16 @@ public class RssFeedService implements FeedService {
             labels.add(article.getLabels().get(i).getValue());
         }
 
-        //LOGGER.info("the source is inside transformArticle: {}, index P {}",src,indexPrimary);
-
         arc = new Article(id,src,linkPrimary,relLinks,labels,article.getName(),article.getDescription(),article.getDatePublished());
         
         return Flux.just(arc);
     }
 
-    // this should detect whats the primary article link, serves as a black list to remove links like github and .txt files; that are relevant but that are not primary links. 
+    /**
+     * This should detect whats the primary article link, serves as a black list to remove links like github and .txt files; that are relevant but that are not primary links. 
+     * @param resources all links related to an article
+     * @return index of the primary article link in the resources array
+     */
     private int detectPrimaryLink(List<Edges> resources) {
         int indexRes = -1; // index of the primary link
         int probableIndex = -1;
@@ -424,7 +427,7 @@ public class RssFeedService implements FeedService {
 
         if (indexRes == -1) {
             if (probableIndex != -1) {
-                indexRes = probableIndex;
+                indexRes = probableIndex;// if the alien vault link is the only valid one, then we take it as a primary link
             } else {
                 indexRes = 0;
             }
@@ -446,6 +449,13 @@ public class RssFeedService implements FeedService {
         return pair;
     }
 
+    /**
+     * Makes an HTTP request to get articles from open cti
+     *
+     * @param url open cti endpoint
+     * @return Flux containing stream of articles non processed (directly pulled from open cti)
+     */
+
     public Flux<ArticlePrimary> sendQuery(String url) {
         LOGGER.info("in send Query");
         Map<String, String> requestBody = new HashMap<>();
@@ -463,21 +473,6 @@ public class RssFeedService implements FeedService {
             LOGGER.info("Initial system build. All information should be pulled from open cti. ");// here the format is good
         }
 
-
-        LOGGER.info("QUERY HERE: {}",requestBody.get("query"));
-
-        // changes come here; best of cases here we return a dto object of whats important from db
-        // return webClient
-        // .post()
-        // .uri(url)
-        // .bodyValue(requestBody)
-        // .retrieve()
-        // .bodyToMono(String.class)// better to stream, than buffering evth in memory TODO
-        // .retryWhen(getRetrySpec("pulling articles from Open CTI"))
-        // .doOnNext(response -> LOGGER.info("Response: "+response))
-        // .then(saveVersionDate())
-        // .doOnError(e->LOGGER.error("Error getting reports from open cti",e));
-
         return webClient
         .post()
         .uri(url)
@@ -486,15 +481,18 @@ public class RssFeedService implements FeedService {
         .bodyToFlux(JsonNode.class)
         .flatMap(json->Flux.fromIterable(json.get("data").get("reports").get("edges")))
         .map(edge->objectMapper.convertValue(edge.get("node"),ArticlePrimary.class))// ArticlePrimary is NOT the object we save to the database, it just primarly
-        //.retryWhen(getRetrySpec("pulling articles from Open CTI"))
-        //.then(saveVersionDate())
         .doOnNext(res->printArticles(res));// apparently this operates on every single article emitted by the flux, need to save this object now to the db instead of printing it
-        //.doOnError(e->LOGGER.error("Error getting reports from open cti",e));
     }
+
+    /**
+     * Print articles for debugging purposes
+     *
+     * @param article Article to be printed
+     * @return void
+     */
 
     public void printArticles(ArticlePrimary article) {
         LOGGER.info("Converted article with id {}",article.getStandardId());
-        //LOGGER.info("The external references are: {}",
         List<String> links = article.getExternalReferences()
             .getEdges().stream()
             .map((e)-> {

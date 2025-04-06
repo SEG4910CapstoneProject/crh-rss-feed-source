@@ -3,7 +3,6 @@ package me.t65.rssfeedsourcetask.emitter;
 import me.t65.rssfeedsourcetask.config.Config;
 import me.t65.rssfeedsourcetask.db.DBService;
 import me.t65.rssfeedsourcetask.db.postgres.dtos.ArticleDataMain;
-import me.t65.rssfeedsourcetask.feed.ArticleData;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +30,13 @@ public class DBEmitter implements EmitterService {
         this.config = config;
         this.scheduler = scheduler;
     }
+
+    /**
+     * Emit data to data store
+     *
+     * @param dbObj Data to push to data store
+     * @return Mono of boolean on success. True if successful, false otherwise
+     */
 
     @Override
     public Mono<Boolean> emitData(ArticleDataMain dbObj) {

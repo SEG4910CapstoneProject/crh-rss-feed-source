@@ -17,12 +17,4 @@ import me.t65.rssfeedsourcetask.db.postgres.composite_keys.ArticleLabelId;
 public class ArticleLabelEntity {
     @EmbeddedId
     private ArticleLabelId id;
-
-    // @Id
-    // @Column(name = "article_id")
-    // private UUID article_id;
-
-    // @Id
-    // @Column(name = "label_id")
-    // private int label_id;
 }

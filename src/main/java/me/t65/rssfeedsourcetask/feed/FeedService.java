@@ -15,8 +15,19 @@ public interface FeedService {
     //Flux<ArticleData> getFeed(FeedUrlPair feedUrlPair);
 
 
-
-
+    /**
+     * Get processed articles as a flux
+     *
+     * @param s empty parameter to start the flux
+     * @return Flux containing stream of articles processed after being pulled from open cti
+     */
     Flux<ArticleDataMain> fetchArticlesFromOpenCti(String s);
+
+    /**
+     * Print a single article to the console for debugging purposes
+     *
+     * @param article article to be printed
+     * @return void
+     */
     void  printArticles(ArticlePrimary article);
 }
