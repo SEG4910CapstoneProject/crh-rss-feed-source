@@ -31,12 +31,6 @@ public class Config {
     @Value("${rss-feed.retries.retry-backoff-millis}")  // same,being read from there as well
     private int feedRetryBackoffMillis;
 
-    /** Bean for building a default rest template */
-    // @Bean
-    // public RestTemplate restTemplate(RestTemplateBuilder restTemplateBuilder) {
-    //     return restTemplateBuilder.build();
-    // }
-
     /**
      * Bean for building web client . This is going to replace rest template    */
     @Bean

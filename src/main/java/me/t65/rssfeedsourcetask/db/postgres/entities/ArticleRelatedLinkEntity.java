@@ -20,13 +20,4 @@ import me.t65.rssfeedsourcetask.db.postgres.composite_keys.ArticleRelatedLinkId;
 public class ArticleRelatedLinkEntity {
     @EmbeddedId
     private ArticleRelatedLinkId id;
-    // @Id
-    // @Column(name = "article_ID",columnDefinition = "uuid")
-    // private UUID articleId;
-
-    // @Id
-    // @Column(name = "rel_link_id")
-    // private int relLinkId;
-
-
 }
