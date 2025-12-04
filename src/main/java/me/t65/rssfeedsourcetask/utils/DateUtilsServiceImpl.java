@@ -8,10 +8,7 @@ import java.util.Date;
 @Service
 public class DateUtilsServiceImpl implements DateUtilsService {
 
-    //private final DBEmitter DBEmitter;
-
     DateUtilsServiceImpl() {
-        //this.DBEmitter = DBEmitter;
     }
     @Override
     public Date getCurrentDate() {

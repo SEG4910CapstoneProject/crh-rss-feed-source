@@ -23,12 +23,3 @@ public class RelatedLinkContentEntity {
     
 
 }
-
-
-// public class ArticleContentEntity {
-//     @Id private UUID id;
-//     private String link;
-//     private String name;
-//     private Date date;
-//     private String description;
-// }

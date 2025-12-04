@@ -10,7 +10,7 @@ public class ArticlePrimary {
     private String standard_id;
 
     @JsonProperty("externalReferences")
-    private ExternalReferences externalRef;// maybe we would need a separate object mapper for this one
+    private ExternalReferences externalRef;
 
     @JsonProperty("objectLabel")
     private List<objectLabel> labels;

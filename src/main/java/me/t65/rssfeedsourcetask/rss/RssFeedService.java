@@ -94,75 +94,6 @@ public class RssFeedService implements FeedService {
 
     }
 
-//     @Override
-//     public Flux<ArticleData> getFeed(FeedUrlPair feedUrlPair) {
-//         // Count of articles/data points for a given article
-//         final AtomicInteger feedCount = new AtomicInteger();
-//         final AtomicInteger failureCount = new AtomicInteger();
-
-//         return Mono.just(feedUrlPair.url())
-//                 .doOnNext(
-//                         url -> LOGGER.info("Started feed {}: url: '{}'", feedUrlPair.source(), url))
-//                 .map(URI::create) // Convert String URL to URI Object,   url -> URI.create(url)
-//                 .map(url -> getFeed(url, feedUrlPair.lastUpdate())) // Generate Feed from URI
-//                 .doOnError(
-//                         e ->
-//                                 LOGGER.error(
-//                                         "Error reading feed.",
-//                                         e)) // if error reading feed, log error
-//                 .retryWhen(
-//                         getRetrySpec(
-//                                 feedUrlPair)) // if an error reading feed, retry according to spec
-//                 .onErrorComplete() // if failed to read from feed, send complete signal to not
-//                 // trigger error handling downstream
-//                 .filter(
-//                         feedTuple ->
-//                                 feedTuple.getT3()) // If last build date is after last update time, if true emit that stream, if false dont emit anything
-//                 .doOnNext(// if we need to repull stuff from the rss feed
-//                         feedTuple ->
-//                                 dbService.saveLastUpdateToDatabase(
-//                                         feedUrlPair.sourceId())) // Save the new last update time
-//                 .flatMapMany(this::getEntries) // Split Feed into individual articles  // we have not a flux of feed entries (aka articles)
-//                 .filter(
-//                         entry ->
-//                                 !detectDuplicateService.isDuplicateArticle(
-//                                         entry.getLink())) // Check if the article is a duplicate
-//                 .flatMap(// just the feed entries that are new
-//                         entry ->
-//                                 transformEntry(
-//                                         entry,
-//                                         feedUrlPair.sourceId(),
-//                                         failureCount)) // Transform articles into db objects
-//                 .doOnError(
-//                         throwable -> {
-//                             LOGGER.error("Unable to complete reading from feeds", throwable);
-//                         })
-//                 .onErrorComplete() // If unstopped error, report it. and end stream
-//                 .doOnNext(entry -> feedCount.incrementAndGet()) // add to feed count when successful
-//                 .doOnComplete(
-//                         () -> // When feed reading complete, log results
-//                         LOGGER.info(
-//                                         "Completed {}: '{}' feed with {} entries. Failed to read"
-//                                                 + " entries: {}",
-//                                         feedUrlPair.source(),
-//                                         feedUrlPair.url(),
-//                                         feedCount.get(),
-//                                         failureCount.get()))
-//                 .subscribeOn(scheduler);
-//     }
-
-    /**
-     * Reads RSS Feed for a given URL. Returns both the received feed and Reader to be closed. Any
-     * errors will generate Error signal
-     *
-     * @param url the url to read as a URI Object
-     * @return Tuple containing Received feed and XML Reader to be closed
-     */
-//     private Tuple3<SyndFeed, XmlReader, Boolean> getFeed(URI url, Date lastUpdate) {
-//         return restTemplate.execute(
-//                 url, HttpMethod.GET, null, response -> processFeed(response, url, lastUpdate));
-//     }
-
     private Tuple3<SyndFeed, XmlReader, Boolean> processFeed(
             ClientHttpResponse response, URI url, Date lastUpdate) throws IOException {
         try {
@@ -214,7 +145,7 @@ public class RssFeedService implements FeedService {
             SyndContent description = syndEntry.getDescription();
 
             ArticlesEntity articlesEntity =
-                    new ArticlesEntity(// saving directly to database from here? Kinda messy, should go throu db service impl
+                    new ArticlesEntity(
                             uuid,
                             sourceId,
                             currentDate,
